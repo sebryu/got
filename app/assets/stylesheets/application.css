@@ -13,3 +13,19 @@
  *= require_tree .
  *= require_self
  */
+
+
+.active {
+  background-color: red;
+  background: red;
+  fill-opacity: 0.2;
+  border: 1px solid black;
+}
+
+circle.active {
+  fill-opacity: 0.5;
+}
+
+rect.active {
+  fill-opacity: 0.65;
+}

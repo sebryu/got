@@ -1,24 +1,19 @@
 ## README
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Project GoT is made for fun and no commercial use by @sebryu.
 
-Things you may want to cover:
+* Ruby version - 2.3
 
-* Ruby version
+* System dependencies - none
 
-* System dependencies
+* Configuration - ?
 
-* Configuration
+* Database creation - postgres
 
-* Database creation
+* Database initialization - rake db:setup
 
-* Database initialization
+* How to run the test suite - none
 
-* How to run the test suite
+* Services (job queues, cache servers, search engines, etc.) - none
 
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+* Deployment instructions - none
