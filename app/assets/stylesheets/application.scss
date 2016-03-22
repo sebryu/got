@@ -15,6 +15,13 @@
  */
 
 
+.Map {
+  svg {
+    position: relative;
+    background: asset-url('map.jpg');
+    background-repeat: round;
+  }
+}
 .active {
   background-color: red;
   background: red;

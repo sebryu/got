@@ -10,6 +10,21 @@ function setCoordsToArea(target, coords) {
   return true;
 };
 
+function noMarchOrderLeft(mapOrders) {
+  _.some(mapOrders, order => {
+    // console.log(order);
+    // TODO: check if order is march order
+    return false
+  });
+  return _.isEmpty(mapOrders);
+};
+
+function noUnitsOn(units, id) {
+  return !_.some(units, unit => {
+    return _.some(unit, ['area', id]);
+  });
+};
+
 var Map = React.createClass({
   getDefaultProps() {
     var orders = [
@@ -64,10 +79,16 @@ var Map = React.createClass({
   },
 
   getInitialState() {
+    var playerAreas = ['karhold', 'winterfell'];
+    var areas = playerAreas.join(', ');
+    var error = 'Your areas - ' + areas;
     return {
       clickedElement: null,
       mapOrders: {},
-      playerAreas: ['karhold', 'winterfell'],
+      playerAreas: playerAreas,
+      turn: 'order placing',
+      message: 'Click on order and then on area',
+      error: error,
       orders: _.cloneDeep(this.props.orders),
       units: _.cloneDeep(this.props.units),
       connections: _.cloneDeep(this.props.connections),
@@ -75,9 +96,8 @@ var Map = React.createClass({
   },
 
   componentDidMount() {
-    // debugger;
-    var propsUnits = this.state.units;
-    _.map(propsUnits, units => {
+    var stateUnits = this.state.units;
+    _.map(stateUnits, units => {
       _.map(units, unit => {
         var area = this.refs[unit.area];
         var coords = {};
@@ -86,10 +106,16 @@ var Map = React.createClass({
         unit.y = coords.y;
       });
     });
-    console.log(propsUnits);
     this.setState({
-      units: propsUnits,
+      units: stateUnits,
     });
+  },
+
+  setError(message) {
+    this.setState({
+      error: message,
+    });
+    return false;
   },
 
   toggleClass(element, klass) {
@@ -116,6 +142,11 @@ var Map = React.createClass({
   },
 
   elementClicked(element) {
+    if (this.state.error) {
+      this.setState({
+        error: '',
+      });
+    }
     var prev = this.state.clickedElement;
     this.highlightElement(element);
     if (prev && prev != element) {
@@ -131,6 +162,27 @@ var Map = React.createClass({
     this.setOrderToCoords(id, order.x, order.y);
   },
 
+  placeUnitsBack() {
+    var stateUnits = this.state.units;
+    _.map(stateUnits, units => {
+      _.map(units, unit => {
+        if (unit.prevArea) {
+          var area = this.refs[unit.prevArea];
+          var coords = {};
+          setCoordsToArea(area, coords);
+          unit.x = coords.x;
+          unit.y = coords.y;
+          unit.area = unit.prevArea;
+          unit.prevArea = null;
+        }
+
+      });
+    });
+    this.setState({
+      units: stateUnits,
+    });
+  },
+
   setOrderToCoords(id, x, y) {
     var orders = this.state.orders;
     var order = _.find(orders, ['id', id]);
@@ -140,7 +192,7 @@ var Map = React.createClass({
     orders.splice(index, 1, order);
 
     this.setState({
-      orders
+      orders,
     });
   },
 
@@ -158,17 +210,36 @@ var Map = React.createClass({
     var unit = _.find(unitsGroup, ['id', id]);
     var index = _.findIndex(unitsGroup, ['id', id]);
 
+    var movingFrom = this.state.movingFrom;
+    if (!this.state.mapOrders[unit.area]) {
+      return this.setError('You dont have march order on area: ' + unit.area);
+    }
+    if (movingFrom) {
+      if (movingFrom != unit.area) {
+        return this.setError('You are already using movement from ' + movingFrom);
+      }
+    } else {
+      this.setState({
+        movingFrom: unit.area,
+      });
+    }
     if (!_.includes(connections[unit.area], areaId)) {
-      return false;
+      return this.setError('You can\'t move unit there');
     }
     unit.x = x;
     unit.y = y;
+    unit.prevArea = unit.area;
     unit.area = areaId;
     unitsGroup.splice(index, 1, unit);
 
     units[group] = unitsGroup;
+    var playerAreas = this.state.playerAreas;
+    if (!_.includes(playerAreas, unit.area)) {
+      playerAreas = playerAreas.concat(unit.area);
+    }
     this.setState({
-      units
+      units,
+      playerAreas,
     });
   },
 
@@ -208,10 +279,13 @@ var Map = React.createClass({
     var playerAreas = this.state.playerAreas;
     var connections = this.props.connections;
 
-    if (prev.localName == 'circle' && _.includes(playerAreas, target.id)) {
-      this.actionOrderToArea(prev, target);
-
-    } else if (prev.localName == 'rect' && prev.parentElement.classList[0] == 'units') {
+    if (prev && prev.localName == 'circle') {
+      if (noUnitsOn(this.state.units, target.id)) {
+        return this.setError('You can\'t place order on that area');
+      } else {
+        this.actionOrderToArea(prev, target);
+      }
+    } else if (prev && prev.localName == 'rect' && prev.parentElement.classList[0] == 'units') {
       this.actionUnitToArea(prev, target);
     }
     this.elementClicked(target);
@@ -219,33 +293,112 @@ var Map = React.createClass({
 
   orderClicked(element) {
     var target = element.target;
-    this.elementClicked(target);
+    if (this.state.turn != 'order placing') {
+      return this.setError('it\'s not order placing turn');
+    } else {
+      this.elementClicked(target);
+    }
   },
 
   unitClicked(element) {
     var target = element.target;
-    this.elementClicked(target);
+    if (this.state.turn != 'movement') {
+      return this.setError('it\'s not movement turn');
+    } else {
+      this.elementClicked(target);
+    }
+  },
+
+  handleClearButton() {
+    switch (this.state.turn) {
+      case 'order placing':
+        _.map(_.map(this.state.orders, 'id'), this.placeOrderBack);
+        this.setState({
+          mapOrders: {},
+          error: '',
+        });
+        break;
+      case 'movement':
+        this.placeUnitsBack();
+
+        this.setState({
+          error: '',
+          movingFrom: null,
+        });
+    }
+  },
+
+  nextOrder(mapOrders) {
+    this.setState({
+      error: 'Play next march order',
+      movingFrom: null,
+      mapOrders,
+    });
+  },
+
+  nextTurn() {
+    this.setState({
+      turn: 'order placing',
+      movingFrom: null,
+      message: 'Click on order and then on area',
+      error: '',
+      mapOrders: {},
+    });
+  },
+
+  handleDoneButton() {
+    let mapOrders = this.state.mapOrders;
+    let playerAreas = this.state.playerAreas;
+    switch (this.state.turn) {
+      case 'order placing':
+        if (_.every(playerAreas, id => {
+          return _.has(mapOrders, id);
+        }) ) {
+          this.setState({
+            turn: 'movement',
+            message: 'Click on units and then on neighbour area',
+            error: '',
+          });
+        } else {
+          var areas = this.state.playerAreas.join(', ');
+          return this.setError('Your areas - ' + areas);
+        }
+        break;
+      case 'movement':
+        let units = this.state.units;
+        _.map(units, groups => {
+          _.map(groups, unit => {
+            if (unit.prevArea) {
+              unit.prevArea = null;
+            }
+          });
+        });
+
+        this.setState({
+          units,
+        });
+        this.placeOrderBack(mapOrders[this.state.movingFrom]);
+        delete mapOrders[this.state.movingFrom];
+        // TODO: leaving prestige token
+        if (noUnitsOn(units, this.state.movingFrom)) {
+          _.pull(playerAreas, this.state.movingFrom);
+        }
+        if (noMarchOrderLeft(mapOrders)) {
+          this.nextTurn();
+        } else {
+          this.nextOrder(mapOrders);
+        }
+    }
   },
 
   controlClicked(element) {
     var target = element.target;
     switch (target.id) {
       case 'clear':
-        _.map(_.map(this.state.orders, 'id'), this.placeOrderBack);
-        this.setState({
-          mapOrders: {}
-        });
+        this.handleClearButton();
         break;
       case 'done':
-        let playerAreas = this.state.playerAreas;
-        let mapOrders = this.state.mapOrders;
-        if (_.every(playerAreas, id => {
-          return _.has(mapOrders, id);
-        }) ) {
-          console.log('ok');
-        } else {
-          console.log('not ok');
-        }
+        this.handleDoneButton();
         break;
     }
   },
@@ -263,7 +416,6 @@ var Map = React.createClass({
 
     var dx, dy, areaCoordsAdjust = this.props.areaCoordsAdjust;
     var coordsAdjust = areaCoordsAdjust[unit.area];
-    if (unit.id == 'siege_engine-0') console.log(unit.area);
     if (coordsAdjust) {
       dx = coordsAdjust.x;
       dy = coordsAdjust.y;
@@ -299,8 +451,24 @@ var Map = React.createClass({
   },
 
   render() {
-    var svgStyle = {position: 'relative', background: 'url(assets/map.jpg)', backgroundRepeat: 'round'};
-    var img;
+    var turn = (
+      <g stroke="black" strokeWidth="1">
+        <text x="700" y="250" fontSize="30" textAnchor="middle" fill='black' fillOpacity='1'>{'Turn :' + this.state.turn}</text>
+      </g>
+    );
+
+    var message = (
+      <g stroke="black" strokeWidth="1">
+        <text x="700" y="300" fontSize="30" textAnchor="middle" fill='black' fillOpacity='1'>{this.state.message}</text>
+      </g>
+    );
+
+    var error = (
+      <g stroke="black" strokeWidth="1">
+        <text x="700" y="350" fontSize="30" textAnchor="middle" fill='black' fillOpacity='1'>{this.state.error}</text>
+      </g>
+    );
+
 
     var orders = (
       <g fillOpacity='0.2' stroke="black" strokeWidth="1">
@@ -325,8 +493,7 @@ var Map = React.createClass({
 
     return (
       <div className='Map'>
-        {img}
-        <svg style={svgStyle} xmlns="http://www.w3.org/2000/svg"
+        <svg xmlns="http://www.w3.org/2000/svg"
           width="27.5in" height="41.3194in" stroke="black" strokeWidth="1" strokeOpacity='1'
           viewBox="0 0 1980 2975" fill="orange" fillOpacity='0'>
           <path onClick={this.pathClicked} id="widows_watch" ref="widows_watch"
@@ -530,6 +697,9 @@ var Map = React.createClass({
                      629.00,346.00 682.00,312.00 682.00,312.00
                      682.00,312.00 718.00,306.00 718.00,306.00
                      718.00,306.00 715.00,286.00 715.00,286.00 z" />
+          {turn}
+          {message}
+          {error}
           {controls}
           {orders}
           {units}
