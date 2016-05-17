@@ -25,6 +25,91 @@ function noUnitsOn(units, id) {
   });
 };
 
+// TODO: start from here
+const TURN = {
+  Orders: 1,
+
+},
+
+let MapObject = {
+  connections: {
+    karhold: ['castle_black', 'winterfell'],
+    castle_black: ['karhold', 'winterfell'],
+    winterfell: ['karhold', 'castle_black', 'the_stony_shore', 'white_harbor'],
+    the_stony_shore: ['winterfell'],
+    white_harbor: ['winterfell', 'widows_watch'],
+    widows_watch: ['white_harbor'],
+  },
+  playerTurn: 'stark',
+  turn: 'orders',
+  turnCount: 1,
+  garrisons: {
+    kings_landing: 5,
+  },
+  influence_tracks: {
+    throne: ['baratheon', 'stark', 'greyjoy'],
+    sword: ['baratheon', 'stark', 'greyjoy'],
+    raven: ['baratheon', 'stark', 'greyjoy'],
+  },
+  dominance_tokens_used: {
+    raven_messanger: false,
+    valyrian_steel_blade: false,
+  },
+  players: {
+    baratheon: {
+      cards: [
+        { name: 'Stannis', power: 4, id: 'stannis', used: false },
+        { name: 'Renly', power: 3, id: 'renly', used: false },
+      ],
+      units: {
+        footmans: [
+          { id: 'footman-0', area: 'karhold', color: "blue" },
+          { id: 'footman-1', area: 'karhold', color: "blue" },
+        ],
+        knights: [
+          { id: 'knight-0', area: 'karhold', color: "blue" },
+          { id: 'knight-1', area: 'winterfell', color: "blue" },
+        ],
+        siege_engines: [
+          { id: 'siege_engine-0', area: 'karhold', color: "blue" },
+        ],
+        ships: [
+
+        ],
+      },
+      orders: {
+
+      },
+      prestige: {
+        count: 5,
+        areas: [],
+      },
+      areas: [],
+
+    },
+    stark: {
+      cards: [
+        { name: 'Eddard', power: 4, id: 'eddard', used: false },
+        { name: 'Robb', power: 3, id: 'robb', used: false },
+      ],
+      units: {
+
+      },
+      orders: {
+
+      },
+      prestige: {
+        count: 5,
+        areas: [],
+      },
+      areas: [],
+    },
+    greyjoy: {
+
+    }
+  },
+}
+
 var Map = React.createClass({
   getDefaultProps() {
     var orders = [
@@ -57,15 +142,6 @@ var Map = React.createClass({
       ]
     };
 
-    var connections = {
-      karhold: ['castle_black', 'winterfell'],
-      castle_black: ['karhold', 'winterfell'],
-      winterfell: ['karhold', 'castle_black', 'the_stony_shore', 'white_harbor'],
-      the_stony_shore: ['winterfell'],
-      white_harbor: ['winterfell', 'widows_watch'],
-      widows_watch: ['white_harbor'],
-    };
-
     var areaCoordsAdjust = {
       white_harbor: { x: -70, y: -20},
     };
@@ -86,7 +162,7 @@ var Map = React.createClass({
       clickedElement: null,
       mapOrders: {},
       playerAreas: playerAreas,
-      turn: 'order placing',
+      turn: 'orders',
       message: 'Click on order and then on area',
       error: error,
       orders: _.cloneDeep(this.props.orders),
@@ -293,8 +369,8 @@ var Map = React.createClass({
 
   orderClicked(element) {
     var target = element.target;
-    if (this.state.turn != 'order placing') {
-      return this.setError('it\'s not order placing turn');
+    if (this.state.turn != 'orders') {
+      return this.setError('it\'s not orders turn');
     } else {
       this.elementClicked(target);
     }
@@ -311,7 +387,7 @@ var Map = React.createClass({
 
   handleClearButton() {
     switch (this.state.turn) {
-      case 'order placing':
+      case 'orders':
         _.map(_.map(this.state.orders, 'id'), this.placeOrderBack);
         this.setState({
           mapOrders: {},
@@ -338,7 +414,7 @@ var Map = React.createClass({
 
   nextTurn() {
     this.setState({
-      turn: 'order placing',
+      turn: 'orders',
       movingFrom: null,
       message: 'Click on order and then on area',
       error: '',
@@ -350,7 +426,7 @@ var Map = React.createClass({
     let mapOrders = this.state.mapOrders;
     let playerAreas = this.state.playerAreas;
     switch (this.state.turn) {
-      case 'order placing':
+      case 'orders':
         if (_.every(playerAreas, id => {
           return _.has(mapOrders, id);
         }) ) {
